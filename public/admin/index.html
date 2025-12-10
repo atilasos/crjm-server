@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Campeonatos</title>
+  <link rel="stylesheet" href="/admin/styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <h1>🏆 Gestão de Campeonatos</h1>
+      <p class="subtitle">Painel de Administração</p>
+    </header>
+
+    <main class="main">
+      <!-- Create Tournament Section -->
+      <section class="card create-section">
+        <h2>Criar Novo Campeonato</h2>
+        <form id="createForm" class="create-form">
+          <div class="form-group">
+            <label for="gameSelect">Jogo:</label>
+            <select id="gameSelect" required>
+              <option value="">Selecionar jogo...</option>
+              <option value="gatos-caes">Gatos & Cães</option>
+              <option value="dominorio">Dominório</option>
+              <option value="quelhas">Quelhas</option>
+              <option value="produto">Produto</option>
+              <option value="atari-go">Atari Go</option>
+              <option value="nex">Nex</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="labelInput">Nome (opcional):</label>
+            <input type="text" id="labelInput" placeholder="Ex: Turma 10A - Maio 2025">
+          </div>
+          <button type="submit" class="btn btn-primary">Criar Campeonato</button>
+        </form>
+      </section>
+
+      <!-- Tournament List -->
+      <section class="card tournaments-section">
+        <div class="section-header">
+          <h2>Campeonatos</h2>
+          <button id="refreshBtn" class="btn btn-secondary btn-small">↻ Atualizar</button>
+        </div>
+        <div id="tournamentList" class="tournament-list">
+          <p class="loading">A carregar...</p>
+        </div>
+      </section>
+
+      <!-- Tournament Details (shown when a tournament is selected) -->
+      <section id="tournamentDetails" class="card details-section hidden">
+        <div class="section-header">
+          <h2 id="detailsTitle">Detalhes do Campeonato</h2>
+          <button id="closeDetailsBtn" class="btn btn-secondary btn-small">✕ Fechar</button>
+        </div>
+        
+        <div class="details-info">
+          <div class="info-row">
+            <span class="label">Estado:</span>
+            <span id="detailsPhase" class="badge"></span>
+          </div>
+          <div class="info-row">
+            <span class="label">Jogo:</span>
+            <span id="detailsGameId"></span>
+          </div>
+          <div class="info-row">
+            <span class="label">Jogadores:</span>
+            <span id="detailsPlayerCount"></span>
+          </div>
+          <div class="info-row" id="championRow" style="display: none;">
+            <span class="label">Campeão:</span>
+            <span id="detailsChampion" class="champion"></span>
+          </div>
+        </div>
+
+        <div class="details-actions">
+          <button id="startTournamentBtn" class="btn btn-success">▶ Iniciar Campeonato</button>
+          <button id="finishTournamentBtn" class="btn btn-danger">⏹ Terminar Campeonato</button>
+          <button id="exportTournamentBtn" class="btn btn-secondary">📥 Exportar</button>
+        </div>
+
+        <!-- Players List -->
+        <div class="details-players">
+          <h3>Jogadores Inscritos</h3>
+          <ul id="playerList" class="player-list"></ul>
+        </div>
+
+        <!-- Bracket View -->
+        <div class="details-bracket">
+          <h3>Bracket</h3>
+          <div id="bracketView" class="bracket-view">
+            <div class="bracket-column">
+              <h4>Winners</h4>
+              <div id="winnersMatches" class="matches-list"></div>
+            </div>
+            <div class="bracket-column">
+              <h4>Losers</h4>
+              <div id="losersMatches" class="matches-list"></div>
+            </div>
+            <div class="bracket-column finals">
+              <h4>Final</h4>
+              <div id="grandFinalMatch" class="matches-list"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>Servidor de Campeonatos de Jogos • Bun + TypeScript</p>
+    </footer>
+  </div>
+
+  <script src="/admin/app.js"></script>
+</body>
+</html>
+
