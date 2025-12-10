@@ -10,6 +10,9 @@ import { ProdutoEngine } from './produto';
 import { AtariGoEngine } from './atari-go';
 import { NexEngine } from './nex';
 
+// Re-export bot strategies
+export { getBotMove, type BotLevel } from './bot-strategies';
+
 // Registry of all game engines
 const gameEngines: Map<GameId, GameEngine<unknown, unknown>> = new Map();
 

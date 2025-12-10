@@ -34,13 +34,20 @@ export const adminApiRoutes = {
   // =========================================================================
   'POST /admin/api/tournaments': async (req: Request) => {
     try {
-      const body = await req.json() as { gameId: GameId; label?: string };
+      const body = await req.json() as { gameId: GameId; label?: string; botCount?: number };
       const tournament = tournamentManager.createTournament(body.gameId, body.label);
+
+      // Add bot players if requested
+      if (body.botCount && body.botCount > 0) {
+        tournamentManager.addBotPlayers(tournament.id, body.botCount);
+      }
+
       return Response.json({
         id: tournament.id,
         gameId: tournament.gameId,
         label: tournament.label,
         phase: tournament.phase,
+        playerCount: tournament.players.size,
       });
     } catch (error) {
       return Response.json({ error: 'Invalid request body' }, { status: 400 });
@@ -59,6 +66,35 @@ export const adminApiRoutes = {
       return Response.json({ error: 'Tournament not found' }, { status: 404 });
     }
     return Response.json(state);
+  },
+
+  // =========================================================================
+  // Add bots to tournament
+  // =========================================================================
+  'POST /admin/api/tournaments/:id/bots': async (req: Request) => {
+    const url = new URL(req.url);
+    const pathParts = url.pathname.split('/');
+    const id = pathParts[pathParts.length - 2];
+
+    try {
+      const body = await req.json() as { count?: number };
+      const count = body.count || 1;
+
+      const bots = tournamentManager.addBotPlayers(id, count);
+      if (bots.length === 0) {
+        return Response.json({ error: 'Failed to add bots. Tournament may not be in registration phase.' }, { status: 400 });
+      }
+
+      broadcastToTournament(id);
+
+      return Response.json({
+        success: true,
+        botsAdded: bots.length,
+        bots: bots.map(b => ({ id: b.id, name: b.name })),
+      });
+    } catch (error) {
+      return Response.json({ error: 'Invalid request body' }, { status: 400 });
+    }
   },
 
   // =========================================================================
@@ -163,6 +199,7 @@ export function matchAdminRoute(method: string, pathname: string): ((req: Reques
     { pattern: /^\/admin\/api\/tournaments\/([^/]+)\/start$/, route: `${method} /admin/api/tournaments/:id/start` },
     { pattern: /^\/admin\/api\/tournaments\/([^/]+)\/finish$/, route: `${method} /admin/api/tournaments/:id/finish` },
     { pattern: /^\/admin\/api\/tournaments\/([^/]+)\/export$/, route: `${method} /admin/api/tournaments/:id/export` },
+    { pattern: /^\/admin\/api\/tournaments\/([^/]+)\/bots$/, route: `${method} /admin/api/tournaments/:id/bots` },
   ];
 
   for (const { pattern, route } of patterns) {

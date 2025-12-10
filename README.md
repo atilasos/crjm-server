@@ -4,17 +4,18 @@ Servidor Bun/TypeScript para gestão de campeonatos de jogos educativos com form
 
 ## Características
 
-- **Dupla Eliminação**: Sistema completo de bracket winners/losers com grand final
-- **Séries Melhor de 3**: Cada confronto é decidido em série, com alternância de quem começa
-- **6 Jogos Suportados**:
-  - Gatos & Cães (4 em linha em tabuleiro 6×6)
-  - Dominório (captura de domínios com dominós)
-  - Quelhas (5 em linha com capturas)
-  - Produto (4 em linha na tabela de multiplicação)
-  - Atari Go (Go simplificado - primeira captura ganha)
-  - Nex (variante de Hex com regra de troca)
-- **WebSocket em Tempo Real**: Comunicação instantânea com os clientes
-- **Painel de Administração**: Interface web para gestão dos campeonatos
+- **Dupla Eliminação**: Brackets winners/losers completos com grand final
+- **Séries Melhor de 3**: Alternância de quem começa em cada jogo
+- **6 Jogos Suportados (regras oficiais)**:
+  - Gatos & Cães — tabuleiro 8×8, restrições de colocação, última jogada ganha
+  - Dominório — tabuleiro 8×8, vertical vs horizontal, quem não joga perde
+  - Quelhas — tabuleiro 10×10, segmentos 2+, swap, última jogada perde (misère)
+  - Produto — tabuleiro hexagonal (61 células), produto dos 2 maiores grupos
+  - Atari Go — 9×9, primeira captura ganha
+  - Nex — 11×11 com peças neutras e swap
+- **Bots**: Jogadores computador para simular campeonatos do início ao fim
+- **WebSocket em Tempo Real**: Comunicação instantânea com clientes
+- **Painel de Administração**: Interface web para gerir campeonatos e bots
 
 ## Requisitos
 
@@ -42,6 +43,12 @@ bun start
 
 O servidor iniciará em `http://localhost:3000` por defeito.
 
+### Testes
+
+```bash
+bun test
+```
+
 ## Endpoints
 
 ### WebSocket
@@ -57,12 +64,26 @@ O servidor iniciará em `http://localhost:3000` por defeito.
 ### Admin API
 
 - `GET /admin/api/tournaments` - Lista todos os campeonatos
-- `POST /admin/api/tournaments` - Cria novo campeonato
+- `POST /admin/api/tournaments` - Cria novo campeonato (aceita `botCount`)
 - `GET /admin/api/tournaments/:id` - Detalhes de um campeonato
+- `POST /admin/api/tournaments/:id/bots` - Adiciona bots durante a fase de inscrição
 - `POST /admin/api/tournaments/:id/start` - Inicia campeonato
 - `POST /admin/api/tournaments/:id/finish` - Termina campeonato
 - `POST /admin/api/tournaments/:id/export` - Exporta estado em JSON
 - `POST /admin/api/tournaments/import` - Importa campeonato
+
+### Bots (Admin)
+
+- Criar campeonato já com bots:
+  ```json
+  POST /admin/api/tournaments
+  { "gameId": "gatos-caes", "label": "Teste", "botCount": 4 }
+  ```
+- Adicionar bots a um campeonato em inscrição:
+  ```json
+  POST /admin/api/tournaments/:id/bots
+  { "count": 2 }
+  ```
 
 ## Protocolo WebSocket
 
@@ -127,6 +148,7 @@ crjmserver/
 │   │   │   └── double-elimination.ts
 │   │   ├── game-engine/          # Motores de jogo
 │   │   │   ├── index.ts
+│   │   │   ├── bot-strategies.ts # Heurísticas de bots por jogo
 │   │   │   ├── gatos-caes.ts
 │   │   │   ├── dominorio.ts
 │   │   │   ├── quelhas.ts
@@ -137,7 +159,8 @@ crjmserver/
 │   │       └── game-session-manager.ts
 │   └── server/
 │       ├── websocket-handler.ts  # Gestão de WebSocket
-│       └── admin-api.ts          # API de administração
+│       ├── admin-api.ts          # API de administração
+│       └── bot-manager.ts        # Orquestra jogadas de bots
 └── public/
     └── admin/                    # Interface de administração
         ├── index.html

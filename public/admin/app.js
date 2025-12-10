@@ -16,6 +16,7 @@ const elements = {
   createForm: document.getElementById('createForm'),
   gameSelect: document.getElementById('gameSelect'),
   labelInput: document.getElementById('labelInput'),
+  botCountInput: document.getElementById('botCountInput'),
   refreshBtn: document.getElementById('refreshBtn'),
   tournamentList: document.getElementById('tournamentList'),
   tournamentDetails: document.getElementById('tournamentDetails'),
@@ -26,6 +27,7 @@ const elements = {
   detailsChampion: document.getElementById('detailsChampion'),
   championRow: document.getElementById('championRow'),
   closeDetailsBtn: document.getElementById('closeDetailsBtn'),
+  addBotsBtn: document.getElementById('addBotsBtn'),
   startTournamentBtn: document.getElementById('startTournamentBtn'),
   finishTournamentBtn: document.getElementById('finishTournamentBtn'),
   exportTournamentBtn: document.getElementById('exportTournamentBtn'),
@@ -49,11 +51,24 @@ async function fetchTournamentDetails(id) {
   return res.json();
 }
 
-async function createTournament(gameId, label) {
+async function createTournament(gameId, label, botCount) {
   const res = await fetch(`${API_BASE}/tournaments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ gameId, label: label || undefined }),
+    body: JSON.stringify({ 
+      gameId, 
+      label: label || undefined,
+      botCount: botCount || 0,
+    }),
+  });
+  return res.json();
+}
+
+async function addBots(id, count) {
+  const res = await fetch(`${API_BASE}/tournaments/${id}/bots`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ count }),
   });
   return res.json();
 }
@@ -127,6 +142,8 @@ function renderTournamentDetails(state) {
   }
 
   // Button states
+  elements.addBotsBtn.disabled = state.phase !== 'registration';
+  elements.addBotsBtn.style.display = state.phase === 'registration' ? 'inline-block' : 'none';
   elements.startTournamentBtn.disabled = state.phase !== 'registration' || state.players.length < 2;
   elements.finishTournamentBtn.disabled = state.phase === 'finished';
 
@@ -140,11 +157,12 @@ function renderTournamentDetails(state) {
 }
 
 function renderPlayerList(players) {
-  const html = players.map(p => `
-    <li class="${p.isOnline ? 'online' : 'offline'}">
-      ${escapeHtml(p.name)}${p.classId ? ` <span style="opacity:0.6">(${escapeHtml(p.classId)})</span>` : ''}
-    </li>
-  `).join('');
+  const html = players.map(p => {
+    const botIndicator = p.isBot ? ' 🤖' : '';
+    const statusClass = p.isBot ? 'bot' : (p.isOnline ? 'online' : 'offline');
+    const classInfo = p.classId ? ` <span style="opacity:0.6">(${escapeHtml(p.classId)})</span>` : '';
+    return `<li class="${statusClass}">${escapeHtml(p.name)}${botIndicator}${classInfo}</li>`;
+  }).join('');
   elements.playerList.innerHTML = html || '<li class="empty-state">Sem jogadores inscritos</li>';
 }
 
@@ -203,15 +221,37 @@ async function handleCreateTournament(e) {
   e.preventDefault();
   const gameId = elements.gameSelect.value;
   const label = elements.labelInput.value.trim();
+  const botCount = parseInt(elements.botCountInput.value) || 0;
   
   if (!gameId) {
     alert('Por favor selecione um jogo.');
     return;
   }
 
-  await createTournament(gameId, label);
+  await createTournament(gameId, label, botCount);
   elements.createForm.reset();
   await refreshTournamentList();
+}
+
+async function handleAddBots() {
+  if (!currentTournamentId) return;
+  
+  const countStr = prompt('Quantos jogadores computador adicionar?', '2');
+  if (!countStr) return;
+  
+  const count = parseInt(countStr);
+  if (isNaN(count) || count < 1 || count > 16) {
+    alert('Por favor introduza um número entre 1 e 16.');
+    return;
+  }
+  
+  const result = await addBots(currentTournamentId, count);
+  if (result.error) {
+    alert(`Erro: ${result.error}`);
+  } else {
+    await refreshCurrentTournament();
+    await refreshTournamentList();
+  }
 }
 
 async function handleStartTournament() {
@@ -306,6 +346,7 @@ function init() {
   elements.createForm.addEventListener('submit', handleCreateTournament);
   elements.refreshBtn.addEventListener('click', refreshTournamentList);
   elements.closeDetailsBtn.addEventListener('click', closeDetails);
+  elements.addBotsBtn.addEventListener('click', handleAddBots);
   elements.startTournamentBtn.addEventListener('click', handleStartTournament);
   elements.finishTournamentBtn.addEventListener('click', handleFinishTournament);
   elements.exportTournamentBtn.addEventListener('click', handleExportTournament);

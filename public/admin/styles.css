@@ -416,6 +416,15 @@ body {
   border-radius: 50%;
 }
 
+.player-list li.bot::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: var(--color-primary);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--color-primary);
+}
+
 /* ============================================================================
    Bracket View
    ============================================================================ */

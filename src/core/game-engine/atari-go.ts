@@ -224,5 +224,66 @@ export class AtariGoEngine implements GameEngine<AtariGoState, AtariGoMove> {
 
     return liberties.size;
   }
+
+  // =========================================================================
+  // Public Helpers for Bot Strategies
+  // =========================================================================
+
+  getValidMoves(state: AtariGoState, player: PlayerRole): AtariGoMove[] {
+    const moves: AtariGoMove[] = [];
+
+    for (let row = 0; row < BOARD_SIZE; row++) {
+      for (let col = 0; col < BOARD_SIZE; col++) {
+        const move: AtariGoMove = { row, col };
+        if (this.validateMove(state, move, player)) {
+          moves.push(move);
+        }
+      }
+    }
+
+    // Pass is always an option
+    moves.push({ row: -1, col: -1, pass: true });
+
+    return moves;
+  }
+
+  // Check if a move would result in a capture
+  wouldCapture(state: AtariGoState, move: AtariGoMove, player: PlayerRole): boolean {
+    if (move.pass) return false;
+
+    const testBoard = deepClone(state.board);
+    const color: CellState = player === 'player1' ? 'black' : 'white';
+    const opponent: CellState = color === 'black' ? 'white' : 'black';
+
+    testBoard[move.row][move.col] = color;
+
+    return this.getAdjacentGroups(testBoard, move.row, move.col, opponent)
+      .some(group => this.countLiberties(testBoard, group) === 0);
+  }
+
+  // Get groups that would be in atari (1 liberty) after a move
+  getGroupsInAtari(state: AtariGoState, color: CellState): [number, number][][] {
+    const groups: [number, number][][] = [];
+    const seen = new Set<string>();
+
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        if (state.board[r][c] !== color) continue;
+        const key = `${r},${c}`;
+        if (seen.has(key)) continue;
+
+        const group = this.getGroup(state.board, r, c);
+        for (const [gr, gc] of group) {
+          seen.add(`${gr},${gc}`);
+        }
+
+        if (this.countLiberties(state.board, group) === 1) {
+          groups.push(group);
+        }
+      }
+    }
+
+    return groups;
+  }
 }
 

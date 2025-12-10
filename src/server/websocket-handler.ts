@@ -24,6 +24,13 @@ import {
 import { generateId } from '../core/utils';
 import { tournamentManager } from '../core/tournament/tournament-manager';
 import { gameSessionManager } from '../core/game-session/game-session-manager';
+import {
+  setBotCallbacks,
+  maybePlayForBot,
+  isBotVsBotMatch,
+  scheduleBotMove,
+  playBotGame,
+} from './bot-manager';
 
 // ============================================================================
 // Connection Management
@@ -33,6 +40,25 @@ type WebSocketData = ConnectionState;
 
 const connections: Map<string, ServerWebSocket<WebSocketData>> = new Map();
 const playerConnections: Map<string, string> = new Map(); // playerId -> connectionId
+
+// ============================================================================
+// Bot Integration Setup
+// ============================================================================
+
+// Set up bot callbacks for game updates
+setBotCallbacks(
+  // On game update (after bot move)
+  (tournamentId, match, sessionId) => {
+    broadcastGameStateUpdate(tournamentId, match, sessionId);
+    
+    // Check if bot should continue playing (for bot vs bot)
+    scheduleBotMove(tournamentId, match, sessionId, 200);
+  },
+  // On game end (after bot's winning move)
+  (tournamentId, match, sessionId, winnerRole) => {
+    handleGameEnd(tournamentId, match, sessionId, winnerRole);
+  }
+);
 
 // ============================================================================
 // WebSocket Handlers
@@ -203,6 +229,9 @@ function handleSubmitMove(ws: ServerWebSocket<WebSocketData>, msg: SubmitMoveMes
   // Handle game over
   if (result.gameOver) {
     handleGameEnd(tournamentId, match, session.id, result.winner);
+  } else {
+    // Check if opponent is a bot and should move
+    scheduleBotMove(tournamentId, match, session.id, 200);
   }
 }
 
@@ -280,6 +309,9 @@ function startGameInMatch(tournamentId: string, match: Match): void {
   }
 
   console.log(`[WS] Started game ${match.currentGame} in match ${match.id}`);
+
+  // Check if first player is a bot and should move
+  scheduleBotMove(tournamentId, match, session.id, 300);
 }
 
 function handleGameEnd(
@@ -369,7 +401,13 @@ function handleMatchEnd(tournamentId: string, match: Match): void {
   // Check for matches ready to start
   const readyMatches = tournamentManager.getMatchesReadyToStart(tournamentId);
   for (const readyMatch of readyMatches) {
-    notifyMatchAssignment(tournamentId, readyMatch);
+    // Check if both players are bots - auto-start the match
+    if (isBotVsBotMatch(tournamentId, readyMatch)) {
+      console.log(`[WS] Auto-starting bot vs bot match ${readyMatch.id}`);
+      startMatchAndNotify(tournamentId, readyMatch.id);
+    } else {
+      notifyMatchAssignment(tournamentId, readyMatch);
+    }
   }
 
   // Cleanup game sessions for this match

@@ -156,6 +156,51 @@ export class TournamentManager {
   }
 
   // =========================================================================
+  // Bot Player Management
+  // =========================================================================
+
+  addBotPlayer(tournamentId: string, name: string): Player | null {
+    const tournament = this.tournaments.get(tournamentId);
+    if (!tournament) {
+      console.log(`[TOURNAMENT] Tournament ${tournamentId} not found`);
+      return null;
+    }
+
+    if (tournament.phase !== 'registration') {
+      console.log(`[TOURNAMENT] Tournament ${tournamentId} is not accepting registrations`);
+      return null;
+    }
+
+    // Create bot player
+    const player: Player = {
+      id: generateId('bot'),
+      name,
+      isOnline: true, // Bots are always "online"
+      isBot: true,
+    };
+
+    tournament.players.set(player.id, player);
+    console.log(`[TOURNAMENT] Bot ${name} added to tournament ${tournamentId}`);
+    return player;
+  }
+
+  addBotPlayers(tournamentId: string, count: number): Player[] {
+    const players: Player[] = [];
+    for (let i = 1; i <= count; i++) {
+      const player = this.addBotPlayer(tournamentId, `Computador ${i}`);
+      if (player) {
+        players.push(player);
+      }
+    }
+    return players;
+  }
+
+  isPlayerBot(tournamentId: string, playerId: string): boolean {
+    const player = this.getPlayer(tournamentId, playerId);
+    return player?.isBot === true;
+  }
+
+  // =========================================================================
   // Tournament Lifecycle
   // =========================================================================
 
@@ -360,6 +405,7 @@ export class TournamentManager {
       name: p.name,
       classId: p.classId,
       isOnline: p.isOnline,
+      isBot: p.isBot,
     }));
 
     const serializeMatch = (match: Match): MatchSummary => ({

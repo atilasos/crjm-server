@@ -1,5 +1,8 @@
 // ============================================================================
 // Dominório Game Engine
+// Players place domino pieces on an 8x8 board
+// One player places vertically, other horizontally
+// Player who cannot move loses
 // ============================================================================
 
 import { GameEngine, GameId, PlayerRole, GameResult } from '../types';
@@ -11,16 +14,9 @@ import { deepClone } from '../utils';
 
 type CellOwner = null | 'player1' | 'player2';
 
-interface Cell {
-  value: number;
-  owner: CellOwner;
-}
-
 interface DominorioState {
-  board: Cell[][];
-  currentPlayer: PlayerRole;
-  player1Score: number;
-  player2Score: number;
+  board: CellOwner[][];
+  currentPlayer: PlayerRole; // player1 = vertical, player2 = horizontal
   lastMove: DominorioMove | null;
   winner: GameResult;
   movesCount: number;
@@ -37,7 +33,7 @@ interface DominorioMove {
 // Constants
 // ============================================================================
 
-const BOARD_SIZE = 5;
+const BOARD_SIZE = 8;
 
 // ============================================================================
 // Engine Implementation
@@ -47,23 +43,14 @@ export class DominorioEngine implements GameEngine<DominorioState, DominorioMove
   readonly gameId: GameId = 'dominorio';
 
   createInitialState(startingPlayer: PlayerRole): DominorioState {
-    // Create 5x5 board with random values 1-6
-    const board: Cell[][] = Array(BOARD_SIZE)
+    // Create 8x8 empty board
+    const board: CellOwner[][] = Array(BOARD_SIZE)
       .fill(null)
-      .map(() =>
-        Array(BOARD_SIZE)
-          .fill(null)
-          .map(() => ({
-            value: Math.floor(Math.random() * 6) + 1,
-            owner: null,
-          }))
-      );
+      .map(() => Array(BOARD_SIZE).fill(null));
 
     return {
       board,
       currentPlayer: startingPlayer,
-      player1Score: 0,
-      player2Score: 0,
       lastMove: null,
       winner: null,
       movesCount: 0,
@@ -93,18 +80,21 @@ export class DominorioEngine implements GameEngine<DominorioState, DominorioMove
       return false;
     }
 
-    // Check cells are adjacent (horizontally or vertically)
-    const isAdjacent =
-      (Math.abs(row1 - row2) === 1 && col1 === col2) ||
-      (Math.abs(col1 - col2) === 1 && row1 === row2);
-
-    if (!isAdjacent) {
+    // Check both cells are unoccupied
+    if (state.board[row1][col1] !== null || state.board[row2][col2] !== null) {
       return false;
     }
 
-    // Check both cells are unoccupied
-    if (state.board[row1][col1].owner !== null || state.board[row2][col2].owner !== null) {
-      return false;
+    // player1 (Vertical) must place vertically (same column, adjacent rows)
+    // player2 (Horizontal) must place horizontally (same row, adjacent columns)
+    if (player === 'player1') {
+      // Vertical: same column, rows differ by 1
+      if (col1 !== col2) return false;
+      if (Math.abs(row1 - row2) !== 1) return false;
+    } else {
+      // Horizontal: same row, columns differ by 1
+      if (row1 !== row2) return false;
+      if (Math.abs(col1 - col2) !== 1) return false;
     }
 
     return true;
@@ -115,36 +105,20 @@ export class DominorioEngine implements GameEngine<DominorioState, DominorioMove
     const { row1, col1, row2, col2 } = move;
 
     // Claim both cells
-    newState.board[row1][col1].owner = player;
-    newState.board[row2][col2].owner = player;
-
-    // Calculate points (sum of cell values)
-    const points =
-      newState.board[row1][col1].value + newState.board[row2][col2].value;
-
-    if (player === 'player1') {
-      newState.player1Score += points;
-    } else {
-      newState.player2Score += points;
-    }
+    newState.board[row1][col1] = player;
+    newState.board[row2][col2] = player;
 
     newState.lastMove = move;
     newState.movesCount++;
 
-    // Check if game is over (no more valid moves)
-    if (this.countValidMoves(newState) === 0) {
-      if (newState.player1Score > newState.player2Score) {
-        newState.winner = 'player1';
-      } else if (newState.player2Score > newState.player1Score) {
-        newState.winner = 'player2';
-      } else {
-        newState.winner = 'draw';
-      }
-    }
+    // Switch turns
+    const nextPlayer: PlayerRole = player === 'player1' ? 'player2' : 'player1';
+    newState.currentPlayer = nextPlayer;
 
-    // Switch turns if game not over
-    if (newState.winner === null) {
-      newState.currentPlayer = player === 'player1' ? 'player2' : 'player1';
+    // Check if next player can move
+    if (!this.hasValidMoves(newState, nextPlayer)) {
+      // Next player cannot move, they lose (current player wins)
+      newState.winner = player;
     }
 
     return newState;
@@ -166,8 +140,6 @@ export class DominorioEngine implements GameEngine<DominorioState, DominorioMove
     return {
       board: state.board,
       currentPlayer: state.currentPlayer,
-      player1Score: state.player1Score,
-      player2Score: state.player2Score,
       lastMove: state.lastMove,
       winner: state.winner,
       movesCount: state.movesCount,
@@ -179,8 +151,6 @@ export class DominorioEngine implements GameEngine<DominorioState, DominorioMove
     return {
       board: data.board,
       currentPlayer: data.currentPlayer,
-      player1Score: data.player1Score,
-      player2Score: data.player2Score,
       lastMove: data.lastMove,
       winner: data.winner,
       movesCount: data.movesCount,
@@ -191,25 +161,38 @@ export class DominorioEngine implements GameEngine<DominorioState, DominorioMove
   // Private Helpers
   // =========================================================================
 
-  private countValidMoves(state: DominorioState): number {
-    let count = 0;
+  private hasValidMoves(state: DominorioState, player: PlayerRole): boolean {
+    const moves = this.getValidMoves(state, player);
+    return moves.length > 0;
+  }
 
-    for (let row = 0; row < BOARD_SIZE; row++) {
-      for (let col = 0; col < BOARD_SIZE; col++) {
-        if (state.board[row][col].owner !== null) continue;
+  // =========================================================================
+  // Public Helper for Bot Strategies
+  // =========================================================================
 
-        // Check right
-        if (col + 1 < BOARD_SIZE && state.board[row][col + 1].owner === null) {
-          count++;
+  getValidMoves(state: DominorioState, player: PlayerRole): DominorioMove[] {
+    const moves: DominorioMove[] = [];
+
+    if (player === 'player1') {
+      // Vertical: check all vertical pairs
+      for (let row = 0; row < BOARD_SIZE - 1; row++) {
+        for (let col = 0; col < BOARD_SIZE; col++) {
+          if (state.board[row][col] === null && state.board[row + 1][col] === null) {
+            moves.push({ row1: row, col1: col, row2: row + 1, col2: col });
+          }
         }
-        // Check down
-        if (row + 1 < BOARD_SIZE && state.board[row + 1][col].owner === null) {
-          count++;
+      }
+    } else {
+      // Horizontal: check all horizontal pairs
+      for (let row = 0; row < BOARD_SIZE; row++) {
+        for (let col = 0; col < BOARD_SIZE - 1; col++) {
+          if (state.board[row][col] === null && state.board[row][col + 1] === null) {
+            moves.push({ row1: row, col1: col, row2: row, col2: col + 1 });
+          }
         }
       }
     }
 
-    return count;
+    return moves;
   }
 }
-

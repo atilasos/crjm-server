@@ -28,6 +28,7 @@ export interface Player {
   classId?: string;
   isOnline: boolean;
   connectionId?: string;
+  isBot?: boolean;
 }
 
 // ============================================================================
@@ -174,7 +175,7 @@ export interface TournamentStateUpdate {
   tournamentId: string;
   gameId: GameId;
   phase: TournamentPhase;
-  players: Array<{ id: string; name: string; classId?: string; isOnline: boolean }>;
+  players: Array<{ id: string; name: string; classId?: string; isOnline: boolean; isBot?: boolean }>;
   winnersMatches: MatchSummary[];
   losersMatches: MatchSummary[];
   grandFinal: MatchSummary | null;

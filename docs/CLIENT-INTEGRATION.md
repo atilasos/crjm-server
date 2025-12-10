@@ -36,12 +36,12 @@ ws.onclose = () => {
 
 | GameId | Nome | Descrição |
 |--------|------|-----------|
-| `gatos-caes` | Gatos & Cães | 4 em linha num tabuleiro 6×6 |
-| `dominorio` | Dominório | Captura de células com dominós (5×5) |
-| `quelhas` | Quelhas | 5 em linha com capturas (9×9) |
-| `produto` | Produto | 4 em linha na tabela de multiplicação (9×9) |
+| `gatos-caes` | Gatos & Cães | Tabuleiro 8×8, última jogada ganha, restrições de adjacência |
+| `dominorio` | Dominório | Tabuleiro 8×8 com dominós, quem não pode jogar perde |
+| `quelhas` | Quelhas | Tabuleiro 10×10, segmentos 2+, última jogada perde |
+| `produto` | Produto | Tabuleiro hexagonal, produto dos 2 maiores grupos |
 | `atari-go` | Atari Go | Go simplificado - primeira captura ganha (9×9) |
-| `nex` | Nex | Variante de Hex com regra de troca (11×11) |
+| `nex` | Nex | Hex com peças neutras e regra de troca (11×11) |
 
 ---
 
@@ -360,119 +360,143 @@ Winners Bracket                    Losers Bracket
 
 ### 5.1 Gatos & Cães (`gatos-caes`)
 
-**Tabuleiro**: 6×6, player1 = gatos (🐱), player2 = cães (🐶)
+**Tabuleiro**: 8×8, player1 = gatos (🐱), player2 = cães (🐶)
+
+**Regras**:
+- Primeiro gato deve ser na zona central (2×2 no meio)
+- Primeiro cão deve ser fora da zona central
+- Não pode colocar gato adjacente a cão (ortogonalmente) e vice-versa
+- Ganha quem faz a última jogada
 
 **Jogada**:
 ```typescript
 {
-  row: number,  // 0-5
-  col: number   // 0-5
+  row: number,  // 0-7
+  col: number   // 0-7
 }
 ```
 
 **Estado**:
 ```typescript
 {
-  board: ('empty' | 'cat' | 'dog')[][],  // 6×6
+  board: ('empty' | 'cat' | 'dog')[][],  // 8×8
   currentPlayer: 'player1' | 'player2',
   catCount: number,
   dogCount: number,
   lastMove: { row: number, col: number } | null,
-  winner: 'player1' | 'player2' | 'draw' | null
+  winner: 'player1' | 'player2' | null,
+  isFirstCatPlaced: boolean,
+  isFirstDogPlaced: boolean
 }
 ```
 
-**Vitória**: 4 peças em linha (horizontal, vertical ou diagonal)
+**Vitória**: Fazer a última jogada (adversário não pode jogar)
 
 ---
 
 ### 5.2 Dominório (`dominorio`)
 
-**Tabuleiro**: 5×5 com valores 1-6 em cada célula
+**Tabuleiro**: 8×8
+
+**Regras**:
+- player1 (Vertical) só pode colocar dominós verticalmente
+- player2 (Horizontal) só pode colocar dominós horizontalmente
+- Vertical começa
+- Perde quem não puder jogar
 
 **Jogada**:
 ```typescript
 {
-  row1: number, col1: number,  // Primeira célula (0-4)
-  row2: number, col2: number   // Segunda célula adjacente (0-4)
+  row1: number, col1: number,  // Primeira célula (0-7)
+  row2: number, col2: number   // Segunda célula adjacente (0-7)
 }
 ```
 
 **Estado**:
 ```typescript
 {
-  board: Array<Array<{
-    value: number,                     // 1-6
-    owner: null | 'player1' | 'player2'
-  }>>,
+  board: (null | 'player1' | 'player2')[][],  // 8×8
   currentPlayer: 'player1' | 'player2',
-  player1Score: number,
-  player2Score: number,
   lastMove: { row1, col1, row2, col2 } | null,
-  winner: 'player1' | 'player2' | 'draw' | null,
+  winner: 'player1' | 'player2' | null,
   movesCount: number
 }
 ```
 
-**Vitória**: Maior pontuação quando não há mais jogadas possíveis
+**Vitória**: Adversário não pode jogar (jogo misère)
 
 ---
 
 ### 5.3 Quelhas (`quelhas`)
 
-**Tabuleiro**: 9×9
+**Tabuleiro**: 10×10
+
+**Regras**:
+- player1 (Vertical) só coloca segmentos verticais de 2+ peças
+- player2 (Horizontal) só coloca segmentos horizontais de 2+ peças
+- Vertical começa
+- Horizontal pode usar "swap" na primeira jogada
+- Perde quem faz a última jogada (jogo misère)
 
 **Jogada**:
 ```typescript
 {
-  row: number,  // 0-8
-  col: number   // 0-8
+  cells: Array<{ row: number, col: number }>,  // 2+ células contíguas
+  swap?: boolean  // true para trocar (só player2, só após 1ª jogada)
 }
 ```
 
 **Estado**:
 ```typescript
 {
-  board: ('empty' | 'player1' | 'player2')[][],
+  board: ('empty' | 'filled')[][],  // 10×10
   currentPlayer: 'player1' | 'player2',
-  player1Captures: number,
-  player2Captures: number,
-  lastMove: { row: number, col: number } | null,
-  winner: 'player1' | 'player2' | 'draw' | null
+  lastMove: { cells: [...], swap?: boolean } | null,
+  winner: 'player1' | 'player2' | null,
+  moveCount: number,
+  canSwap: boolean,
+  swapped: boolean
 }
 ```
 
-**Vitória**: 5 em linha OU 5 capturas (captura custodiana de pares)
+**Vitória**: Adversário não pode jogar (quem faz última jogada perde)
 
 ---
 
 ### 5.4 Produto (`produto`)
 
-**Tabuleiro**: 9×9 (tabela de multiplicação)
+**Tabuleiro**: Hexagonal com 5 casas de lado (61 células)
+
+**Regras**:
+- player1 = preto, player2 = branco
+- Cada jogada: colocar 2 peças de QUALQUER cor (1ª jogada: apenas 1 peça)
+- Quando cheio: calcular produto dos 2 maiores grupos de cada cor
+- Maior produto ganha; se empate, menos peças da própria cor ganha
 
 **Jogada**:
 ```typescript
 {
-  factor: 1 | 2,    // Qual fator mover
-  position: number  // Nova posição (1-9)
+  placements: Array<{
+    coord: { q: number, r: number },  // Coordenadas axiais
+    color: 'black' | 'white'
+  }>  // 1 ou 2 elementos
 }
 ```
 
 **Estado**:
 ```typescript
 {
-  grid: number[][],              // Tabela de multiplicação fixa
-  player1Marked: boolean[][],    // Células marcadas por player1
-  player2Marked: boolean[][],    // Células marcadas por player2
+  board: Map<string, 'empty' | 'black' | 'white'>,  // 61 células
   currentPlayer: 'player1' | 'player2',
-  factor1Position: number,       // Posição do fator 1 (1-9)
-  factor2Position: number,       // Posição do fator 2 (1-9)
-  lastMove: { factor: 1|2, position: number } | null,
-  winner: 'player1' | 'player2' | 'draw' | null
+  lastMove: { placements: [...] } | null,
+  winner: 'player1' | 'player2' | 'draw' | null,
+  moveCount: number,
+  blackPiecesPlaced: number,
+  whitePiecesPlaced: number
 }
 ```
 
-**Vitória**: 4 marcações em linha
+**Vitória**: Maior produto de grupos quando o tabuleiro está cheio
 
 ---
 
@@ -508,32 +532,41 @@ Winners Bracket                    Losers Bracket
 
 ### 5.6 Nex (`nex`)
 
-**Tabuleiro**: 11×11 hexagonal, player1 conecta topo↔fundo, player2 conecta esquerda↔direita
+**Tabuleiro**: 11×11, player1 (preto) conecta topo↔fundo, player2 (branco) conecta esquerda↔direita
+
+**Regras**:
+- 3 tipos de peças: pretas, brancas e neutras (cinzentas)
+- Jogada tipo 1: colocar 1 peça própria + 1 neutra em casas vazias
+- Jogada tipo 2: converter 2 neutras para própria + converter 1 própria para neutra
+- Regra de troca: após 1ª jogada, player2 pode trocar cores
 
 **Jogada**:
 ```typescript
 {
-  row: number,    // 0-10
-  col: number,    // 0-10
-  swap?: boolean  // true para usar regra de troca (só player2, só no 2º turno)
+  type: 'place' | 'convert' | 'swap',
+  // Para 'place':
+  ownPiece?: { row: number, col: number },
+  neutralPiece?: { row: number, col: number },
+  // Para 'convert':
+  neutralsToConvert?: Array<{ row: number, col: number }>,  // 2 células
+  ownToNeutral?: { row: number, col: number }
 }
 ```
 
 **Estado**:
 ```typescript
 {
-  board: ('empty' | 'player1' | 'player2')[][],
+  board: ('empty' | 'black' | 'white' | 'neutral')[][],  // 11×11
   currentPlayer: 'player1' | 'player2',
-  lastMove: { row, col, swap? } | null,
-  winner: 'player1' | 'player2' | null,  // Hex não tem empate
+  lastMove: NexMove | null,
+  winner: 'player1' | 'player2' | null,
   moveCount: number,
-  canSwap: boolean  // true se player2 pode usar swap
+  canSwap: boolean,
+  swapped: boolean
 }
 ```
 
-**Vitória**: Conectar os dois lados opostos do tabuleiro
-
-**Regra de troca**: Após a primeira jogada de player1, player2 pode escolher trocar (ficar com a posição de player1)
+**Vitória**: Conectar os dois lados opostos do tabuleiro com a sua cor
 
 ---
 
@@ -653,7 +686,59 @@ class TournamentClient {
 
 ---
 
-## 7. Notas Importantes
+## 7. Jogadores Computador (Bots)
+
+O servidor suporta jogadores controlados por computador para testar campeonatos sem jogadores humanos.
+
+### Características dos Bots
+
+- **Identificação**: Jogadores bot têm `isBot: true` no seu objeto de jogador
+- **Comportamento**: Jogam automaticamente quando é a sua vez (sem necessidade de WebSocket)
+- **Estratégias**: Cada jogo tem estratégias específicas implementadas (heurísticas avançadas)
+- **Partidas automáticas**: Partidas entre dois bots iniciam e decorrem automaticamente
+
+### Criar Campeonato com Bots (Admin)
+
+Através da API de administração:
+
+```typescript
+// Criar campeonato com 4 bots
+POST /admin/api/tournaments
+{
+  "gameId": "gatos-caes",
+  "label": "Teste com Bots",
+  "botCount": 4
+}
+
+// Adicionar 2 bots a um campeonato existente
+POST /admin/api/tournaments/{id}/bots
+{
+  "count": 2
+}
+```
+
+### Campo `isBot` em Jogadores
+
+```typescript
+// No tournament_state_update, cada jogador pode ter:
+{
+  id: string,
+  name: string,
+  classId?: string,
+  isOnline: boolean,
+  isBot?: boolean  // true se for jogador computador
+}
+```
+
+### Nota para Clientes
+
+- Bots aparecem sempre como "online" (`isOnline: true`)
+- Bots nunca enviam mensagens `ready_for_match` - o servidor trata disso automaticamente
+- Quando jogas contra um bot, as jogadas dele aparecem normalmente via `game_state_update`
+
+---
+
+## 8. Notas Importantes
 
 1. **Reconexão**: Guarda o `playerId` e envia-o no `join_tournament` para reconectar
 2. **Validação**: Todas as jogadas são validadas no servidor - jogadas inválidas retornam `error`
@@ -661,4 +746,5 @@ class TournamentClient {
 4. **Fase de registo**: Jogadores só podem entrar quando `phase === 'registration'`
 5. **Ordem dos turnos**: Verifica sempre `yourTurn` antes de permitir jogada
 6. **Melhor de 3**: Uma partida pode ter 2 ou 3 jogos - usa `matchScore` para mostrar progresso
+7. **Jogadores computador**: Bots têm `isBot: true` e jogam automaticamente
 
